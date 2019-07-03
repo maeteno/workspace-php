@@ -1,4 +1,4 @@
-FROM maeteno/swoole
+FROM maeteno/swoole:7.2
 
 LABEL maintainer="Alan <ssisoo@live.cn>"
 
