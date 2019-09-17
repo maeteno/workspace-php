@@ -1,13 +1,47 @@
-FROM maeteno/swoole
-
+FROM hyperf/hyperf:7.2-alpine-cli
 LABEL maintainer="Alan <ssisoo@live.cn>"
 
-RUN apt-get update -y \
-&& apt-get install -y gcc g++ autoconf make file bison curl git zip unzip 
+ARG timezone
 
-RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
-&& php -r "if (hash_file('sha384', 'composer-setup.php') === '48e3236262b34d30969dca3c37281b3b4bbe3221bda826ac6a9a62d6444cdb0dcd0615698a5cbe587c3f0fe57a54d8f5') { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;" \
-&& php composer-setup.php --filename=composer --install-dir=/bin \
-&& php -r "unlink('composer-setup.php');"
+ENV TIMEZONE=${timezone:-"Asia/Shanghai"} \
+    COMPOSER_VERSION=1.8.6 \
+    APP_ENV=test
+
+# update
+RUN set -ex \
+    && apk update \
+    # install mysql
+    && apk add mariadb mariadb-client \
+    && mysql_install_db --user=mysql --datadir=/var/lib/mysql \
+    && cp /usr/share/mariadb/mysql.server /etc/init.d/mysqld \
+    && /etc/init.d/mysqld start \
+    && /usr/bin/mysqladmin -u root password root \
+    # install redis
+    && apk add redis \
+    && echo "daemonize yes" >> /etc/redis.conf \
+    && redis-server /etc/redis.conf \
+    # install composer
+    && cd /tmp \
+    && wget https://github.com/composer/composer/releases/download/${COMPOSER_VERSION}/composer.phar \
+    && chmod u+x composer.phar \
+    && mv composer.phar /usr/local/bin/composer \
+    # show php version and extensions
+    && php -v \
+    && php -m \
+    #  ---------- some config ----------
+    && cd /etc/php7 \
+    # - config PHP
+    && { \
+        echo "upload_max_filesize=100M"; \
+        echo "post_max_size=108M"; \
+        echo "memory_limit=1024M"; \
+        echo "date.timezone=${TIMEZONE}"; \
+    } | tee conf.d/99-overrides.ini \
+    # - config timezone
+    && ln -sf /usr/share/zoneinfo/${TIMEZONE} /etc/localtime \
+    && echo "${TIMEZONE}" > /etc/timezone \
+    # ---------- clear works ----------
+    && rm -rf /var/cache/apk/* /tmp/* /usr/share/man \
+    && echo -e "\033[42;37m Build Completed :).\033[0m\n"
 
 CMD ["/bin/sh"]
