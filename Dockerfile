@@ -10,7 +10,16 @@ ENV TIMEZONE=${timezone:-"Asia/Shanghai"} \
 # update
 RUN set -ex \
     && apk update \
-    && apk add mysql-client \
+    # install mysql
+    && apk add mariadb mariadb-client \
+    && mysql_install_db --user=mysql --datadir=/var/lib/mysql \
+    && cp /usr/share/mariadb/mysql.server /etc/init.d/mysqld \
+    && /etc/init.d/mysqld start \
+    && /usr/bin/mysqladmin -u root password root \
+    # install redis
+    && apk add redis \
+    && echo "daemonize yes" >> /etc/redis.conf \
+    && redis-server /etc/redis.conf \
     # install composer
     && cd /tmp \
     && wget https://github.com/composer/composer/releases/download/${COMPOSER_VERSION}/composer.phar \
